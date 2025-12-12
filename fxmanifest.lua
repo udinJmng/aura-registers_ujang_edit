@@ -4,7 +4,7 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 author 'Aura Development'
 description 'Free register system for jobs.'
-version '1.0'
+version '1.0.0'
 
 shared_scripts {
   '@ox_lib/init.lua',

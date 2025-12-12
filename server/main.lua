@@ -12,7 +12,7 @@ local function generateInvoiceId()
 end
 
 if Config.VersionCheck then
-    lib.versionCheck('auradevelopment5m/aura_registers')
+    lib.versionCheck('auradevelopment5m/aura-registers')
 end
 
 QBCore.Functions.CreateCallback("aura-registers:server:CreateInvoice", function(source, cb, data)
