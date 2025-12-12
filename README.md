@@ -9,14 +9,13 @@ Aura Registers is a comprehensive point-of-sale (POS) system designed for FiveM 
 ## Features
 
 - **Job-Based Access**: Restrict register access to specific jobs (e.g., burgershot, beanmachine).
-- **Multiple Locations**: Define multiple register locations per business with precise coordinates.
+- **Multiple Locations**: Define multiple register locations per business with coordinates.
 - **Item Management**: Pre-configure menu items with prices, images, and categories.
 - **Invoice System**: Create detailed invoices for customers with itemized lists.
 - **Payment Methods**: Support for both card and cash payments.
 - **Custom Bills**: Create custom invoices with any amount and description.
-- **Web Interface**: Modern, responsive UI built with HTML/CSS/JS.
+- **Web Interface**: Modern, responsive UI built with react & typescript.
 - **Multi-Language Support**: Built-in support for English, Spanish, Turkish, and Arabic.
-- **Audio Feedback**: Sound effects for user interactions.
 - **Version Checking**: Automatic update notifications.
 
 ## Installation
@@ -28,9 +27,9 @@ Aura Registers is a comprehensive point-of-sale (POS) system designed for FiveM 
    - Ensure you have the following dependencies installed:
      - [qb-core](https://github.com/qbcore-framework/qb-core)
      - [ox_lib](https://github.com/overextended/ox_lib)
-     - [qb-inventory](https://github.com/qbcore-framework/qb-inventory) (for item images)
+     - [qb-inventory](https://github.com/qbcore-framework/qb-inventory) (for item images, this is optional)
 
-3. **Add to server.cfg**:
+3. **Make sure your server.cfg follows this structure**:
    ```cfg
    ensure qb-core
    ensure ox_lib
@@ -87,7 +86,7 @@ Add or modify language files in the `locales/` folder. Supported locales:
 1. **Access Register**: Approach a register location and interact (target or enter zone).
 2. **Add Items**: Browse categories and add items to the cart.
 3. **Create Invoice**: Enter customer ID and confirm payment method.
-4. **Custom Bills**: Use "Create Custom Bill" for non-menu transactions.
+4. **Custom Bills**: Use "Create Custom Bill" for custom transactions.
 
 ### For Customers
 
@@ -95,21 +94,12 @@ Add or modify language files in the `locales/` folder. Supported locales:
 2. **View Invoices**: Access "My Invoices" to see pending/paid bills.
 3. **Pay Invoice**: Select payment method (card/cash) and confirm.
 
-### Commands
-
-- No specific commands; interaction is location-based.
-
 ## Support
 
 For issues or questions:
 - Create an issue on GitHub
-- Join our Discord community
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Join our [Discord](https://discord.gg/UpbdeQNaD7) community
 
 ## Credits
 
 - Developed by Aura Development
-- Built for QBCore framework
