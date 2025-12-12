@@ -97,6 +97,7 @@ Add or modify language files in the `locales/` folder. Supported locales:
 ## Support
 
 For issues or questions:
+- [Documentation](https://aura-development.gitbook.io/aura-development-docs/documentation/free-releases/aura-registers)
 - Create an issue on GitHub
 - Join our [Discord](https://discord.gg/UpbdeQNaD7) community
 
