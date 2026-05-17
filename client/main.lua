@@ -1,4 +1,4 @@
-local QBCore = exports["qb-core"]:GetCoreObject()
+local Ox = exports.ox_inventory
 
 local localeData = {}
 local allLocales = {}
@@ -28,7 +28,7 @@ _G.locale = function(key, ...)
     for k in string.gmatch(key, "([^%.]+)") do
         table.insert(keys, k)
     end
-    
+
     local current = localeData
     for _, k in ipairs(keys) do
         if current and type(current) == "table" and current[k] then
@@ -37,14 +37,14 @@ _G.locale = function(key, ...)
             return key
         end
     end
-    
+
     if type(current) == "string" then
         if ... then
             return current:format(...)
         end
         return current
     end
-    
+
     return key
 end
 
@@ -57,13 +57,13 @@ local activeZones = {}
 local function unregisterAllTargets()
     for _, entity in ipairs(activeTargets) do
         if DoesEntityExist(entity) then
-            exports['qb-target']:RemoveTargetEntity(entity)
+            exports['ox_target']:RemoveTargetEntity(entity)
         end
     end
     activeTargets = {}
 
     for _, zoneId in ipairs(activeZones) do
-        exports['qb-target']:RemoveZone(zoneId)
+        exports['ox_target']:RemoveZone(zoneId)
     end
     activeZones = {}
 end
@@ -84,7 +84,7 @@ local function registerTargetsForJob(playerJob)
                     FreezeEntityPosition(obj, true)
                     SetEntityInvincible(obj, true)
 
-                    exports['qb-target']:AddTargetEntity(obj, {
+                    exports['ox_target']:AddTargetEntity(obj, {
                         options = {{
                             type = "client",
                             event = "aura-registers:client:openRegister",
@@ -100,7 +100,7 @@ local function registerTargetsForJob(playerJob)
             elseif registerConfig.openingMethod == "boxzone" then
                 for i, propData in ipairs(registerConfig.locations) do
                     local zoneId = string.format("%s_%d", registerName, i)
-                    exports['qb-target']:AddBoxZone(zoneId, propData.coords, 1.5, 1.5, {
+                    exports['ox_target']:AddBoxZone(zoneId, propData.coords, 1.5, 1.5, {
                         name = zoneId,
                         heading = propData.heading,
                         debugPoly = false,
@@ -129,21 +129,20 @@ end
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName == GetCurrentResourceName() then
         Wait(1000)
-        local playerData = QBCore.Functions.GetPlayerData()
-        if playerData and playerData.job then
-            registerTargetsForJob(playerData.job.name)
+        local xPlayer = Ox.GetPlayer(source)
+        if xPlayer then
+            registerTargetsForJob(xPlayer.getJob())
         end
     end
 end)
 
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-    local playerData = QBCore.Functions.GetPlayerData()
-    if playerData and playerData.job then
-        registerTargetsForJob(playerData.job.name)
-    end
-end)
+local function onPlayerLoaded(player)
+    registerTargetsForJob(player.getJob())
+end
 
-RegisterNetEvent('QBCore:Client:OnJobUpdate', function(job)
+RegisterNetEvent('esx:playerLoaded', onPlayerLoaded)
+
+RegisterNetEvent('esx:setJob', function(job)
     registerTargetsForJob(job.name)
 end)
 
@@ -154,18 +153,13 @@ AddEventHandler('onResourceStop', function(resourceName)
 end)
 
 local function openRegister(registerName)
-    local playerData = QBCore.Functions.GetPlayerData()
-
-    if not playerData or not playerData.job then
-        lib.notify({
-            title = "Error",
-            description = "Unable to get player job data.",
-            type = "error"
-        })
+    local player = Ox.GetPlayer(source)
+    if not player then
+        lib.notify({title = "Error", description = "Unable to get player data.", type = "error"})
         return
     end
 
-    local playerJob = playerData.job.name
+    local playerJob = player.getJob()
 
     if not registerName then
         for regName, regData in pairs(Config.Registers) do
@@ -176,32 +170,20 @@ local function openRegister(registerName)
         end
 
         if not registerName then
-            lib.notify({
-                title = "Access Denied",
-                description = "You do not have permission to access any register.",
-                type = "error"
-            })
+            lib.notify({title = "Access Denied", description = "You do not have permission to access any register.", type = "error"})
             return
         end
     end
 
     if not Config.Registers[registerName] then
-        lib.notify({
-            title = "Invalid Register",
-            description = string.format("Register '%s' not found in configuration.", registerName),
-            type = "error"
-        })
+        lib.notify({title = "Invalid Register", description = string.format("Register '%s' not found in configuration.", registerName), type = "error"})
         return
     end
 
     local registerData = Config.Registers[registerName]
 
     if playerJob ~= registerData.jobRequired then
-        lib.notify({
-            title = "Access Denied",
-            description = "You do not have permission to access this register.",
-            type = "error"
-        })
+        lib.notify({title = "Access Denied", description = "You do not have permission to access this register.", type = "error"})
         return
     end
 
@@ -214,27 +196,26 @@ local function openRegister(registerName)
             menuItems = registerData.menuItems,
             categories = registerData.categories,
             locales = allLocales,
-            currentLocale = Config.DefaultLocale or "es"
+            currentLocale = Config.DefaultLocale or "en"
         }
     })
 end
 
 RegisterNetEvent("aura-registers:client:openRegister", function(data)
-    openRegister(data.registerName)
+    openRegister({registerName = data and data.registerName})
 end)
 
 RegisterCommand("viewinvoices", function()
-    QBCore.Functions.TriggerCallback("aura-registers:server:GetInvoices", function(invoices)
-        SetNuiFocus(true, true)
-        SendNUIMessage({
-            type = "ui:invoices",
-            payload = {
-                invoices = invoices,
-                locales = allLocales,
-                currentLocale = Config.DefaultLocale or "es"
-            }
-        })
-    end)
+    local invoices = lib.callback.await("aura-registers:server:GetInvoices")
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        type = "ui:invoices",
+        payload = {
+            invoices = invoices,
+            locales = allLocales,
+            currentLocale = Config.DefaultLocale or "en"
+        }
+    })
 end, false)
 
 RegisterNUICallback("ui:closeNUI", function(data, cb)
@@ -244,21 +225,19 @@ RegisterNUICallback("ui:closeNUI", function(data, cb)
 end)
 
 RegisterNUICallback("ui:billPlayer", function(data, cb)
-    local playerData = QBCore.Functions.GetPlayerData()
-
-    if not playerData or not playerData.job then
+    local player = Ox.GetPlayer(source)
+    if not player then
         cb({success = false, message = "No job data found"})
         return
     end
 
     if data.paymentMethod == "cash" and not data.customLabel then
-        QBCore.Functions.TriggerCallback("aura-registers:server:PayCash", function(result)
-            cb(result)
-        end, {
+        local result = lib.callback.await("aura-registers:server:PayCash", {
             targetId = data.targetId,
             amount = data.amount,
-            registerJob = playerData.job.name
+            registerJob = player.getJob()
         })
+        cb(result)
     else
         local invoiceItems = data.items or {}
         if data.customItem then
@@ -269,43 +248,38 @@ RegisterNUICallback("ui:billPlayer", function(data, cb)
                 quantity = 1
             }}
         end
-        
-        QBCore.Functions.TriggerCallback("aura-registers:server:CreateInvoice", function(result)
-            cb(result)
-        end, {
+
+        local result = lib.callback.await("aura-registers:server:CreateInvoice", {
             targetId = data.targetId,
             amount = data.amount,
             items = invoiceItems,
             registerLabel = data.registerLabel,
-            registerJob = playerData.job.name,
+            registerJob = player.getJob(),
             customLabel = data.customLabel
         })
+        cb(result)
     end
 end)
 
 RegisterNUICallback("ui:payInvoice", function(data, cb)
-    QBCore.Functions.TriggerCallback("aura-registers:server:PayInvoice", function(result)
-        if not result or not result.success then
-            cb({success = false, message = "Payment failed - please try again"})
-            return
-        end
-        
-        if result.success then
-            QBCore.Functions.TriggerCallback("aura-registers:server:GetInvoices", function(invoices)
-                if invoices then
-                    SendNUIMessage({
-                        type = "ui:invoices",
-                        payload = {
-                            invoices = invoices,
-                            locales = allLocales,
-                            currentLocale = Config.DefaultLocale or "es"
-                        }
-                    })
-                end
-                cb(result)
-            end)
-        else
-            cb(result)
-        end
-    end, data.invoiceId)
+    local result = lib.callback.await("aura-registers:server:PayInvoice", data.invoiceId)
+
+    if not result or not result.success then
+        cb({success = false, message = "Payment failed - please try again"})
+        return
+    end
+
+    if result.success then
+        local invoices = lib.callback.await("aura-registers:server:GetInvoices")
+        SendNUIMessage({
+            type = "ui:invoices",
+            payload = {
+                invoices = invoices,
+                locales = allLocales,
+                currentLocale = Config.DefaultLocale or "en"
+            }
+        })
+    end
+
+    cb(result)
 end)

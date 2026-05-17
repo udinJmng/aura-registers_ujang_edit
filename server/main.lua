@@ -1,4 +1,4 @@
-local QBCore = exports["qb-core"]:GetCoreObject()
+local Ox = exports.ox_inventory
 local INVOICE_PREFIX = "INV_"
 local INVOICE_STATUS_PENDING = "pending"
 local INVOICE_STATUS_PAID = "paid"
@@ -15,29 +15,28 @@ if Config.VersionCheck then
     lib.versionCheck('auradevelopment5m/aura-registers')
 end
 
-QBCore.Functions.CreateCallback("aura-registers:server:CreateInvoice", function(source, cb, data)
-    local src = source
-    local player = QBCore.Functions.GetPlayer(src)
-    local targetPlayer = QBCore.Functions.GetPlayer(tonumber(data.targetId))
+lib.callback.register("aura-registers:server:CreateInvoice", function(source, data)
+    local creator = Ox.GetPlayer(source)
+    local target = Ox.GetPlayer(tonumber(data.targetId))
 
-    if not player or not targetPlayer then
-        cb({success = false, message = locale("notifications.invalid_players")})
-        return
+    if not creator or not target then
+        return {success = false, message = locale("notifications.invalid_players")}
     end
 
-    if player.PlayerData.job.name ~= data.registerJob then
-        cb({success = false, message = locale("notifications.unauthorized")})
-        return
+    if creator.getJob() ~= data.registerJob then
+        return {success = false, message = locale("notifications.unauthorized")}
     end
 
     local invoiceId = generateInvoiceId()
+    local creatorName = creator.getName(true)
+    local targetName = target.getName(true)
 
     local invoice = {
         id = invoiceId,
-        fromId = src,
-        fromName = player.PlayerData.charinfo.firstname .. " " .. player.PlayerData.charinfo.lastname,
+        fromId = source,
+        fromName = creatorName,
         toId = tonumber(data.targetId),
-        toName = targetPlayer.PlayerData.charinfo.firstname .. " " .. targetPlayer.PlayerData.charinfo.lastname,
+        toName = targetName,
         amount = data.amount,
         items = data.items,
         registerLabel = data.customLabel or data.registerLabel,
@@ -51,109 +50,102 @@ QBCore.Functions.CreateCallback("aura-registers:server:CreateInvoice", function(
     end
     table.insert(ActiveInvoices[tonumber(data.targetId)], invoice)
 
-    TriggerClientEvent("QBCore:Notify", tonumber(data.targetId), locale("notifications.invoice_received", invoice.fromName, data.amount), "success")
+    TriggerEvent('ox_lib:notify', tonumber(data.targetId), {
+        title = locale("notifications.invoice_received_title"),
+        description = locale("notifications.invoice_received", creatorName, data.amount),
+        type = 'success'
+    })
 
-    cb({success = true, invoiceId = invoiceId})
+    return {success = true, invoiceId = invoiceId}
 end)
 
-QBCore.Functions.CreateCallback("aura-registers:server:GetInvoices", function(source, cb)
-    local src = source
-    local invoices = ActiveInvoices[src] or {}
-    cb(invoices)
+lib.callback.register("aura-registers:server:GetInvoices", function(source)
+    return ActiveInvoices[source] or {}
 end)
 
-QBCore.Functions.CreateCallback("aura-registers:server:PayInvoice", function(source, cb, invoiceId)
-    local src = source
-    local player = QBCore.Functions.GetPlayer(src)
+lib.callback.register("aura-registers:server:PayInvoice", function(source, invoiceId)
+    local player = Ox.GetPlayer(source)
 
     if not player then
-        cb({success = false, message = locale("notifications.invalid_players")})
-        return
+        return {success = false, message = locale("notifications.invalid_players")}
     end
 
-    local playerInvoices = ActiveInvoices[src]
+    local playerInvoices = ActiveInvoices[source]
     if not playerInvoices then
-        cb({success = false, message = locale("notifications.no_invoices")})
-        return
+        return {success = false, message = locale("notifications.no_invoices")}
     end
 
     for i, invoice in ipairs(playerInvoices) do
         if invoice.id == invoiceId and invoice.status == INVOICE_STATUS_PENDING then
-            if player.PlayerData.money.bank < invoice.amount then
-                cb({success = false, message = locale("notifications.insufficient_funds")})
-                return
+            local cashCount = Ox.GetItemCount(source, 'money')
+            if cashCount < invoice.amount then
+                TriggerEvent('ox_lib:notify', source, {
+                    title = locale("notifications.insufficient_funds_title"),
+                    description = locale("notifications.insufficient_funds"),
+                    type = 'error'
+                })
+                return {success = false, message = locale("notifications.insufficient_funds")}
             end
 
-            player.Functions.RemoveMoney("bank", invoice.amount)
-
-            local bankingSuccess = false
-            local bankingError = nil
-            if GetResourceState('qb-banking') == 'started' then
-                local success, result = pcall(function()
-                    return exports['qb-banking']:AddMoney(invoice.registerJob, invoice.amount, "Invoice Payment")
-                end)
-
-                bankingSuccess = success and (result == nil or result == true)
-                if not success then
-                    bankingError = result
-                end
-            end
-
-            if not bankingSuccess then
-                local fromPlayer = QBCore.Functions.GetPlayer(invoice.fromId)
-                if fromPlayer then
-                    fromPlayer.Functions.AddMoney("bank", invoice.amount)
-                else
-                    player.Functions.AddMoney("bank", invoice.amount)
-                    cb({success = false, message = locale("notifications.payment_failed")})
-                    return
-                end
-            end
+            Ox.RemoveItem(source, 'money', invoice.amount)
+            Ox.AddItem(invoice.fromId, 'money', invoice.amount)
 
             invoice.status = INVOICE_STATUS_PAID
             invoice.paidAt = os.time()
 
-            TriggerClientEvent("QBCore:Notify", src, locale("notifications.invoice_paid"), "success")
+            TriggerEvent('ox_lib:notify', source, {
+                title = locale("notifications.invoice_paid_title"),
+                description = locale("notifications.invoice_paid"),
+                type = 'success'
+            })
 
-            local fromPlayer = QBCore.Functions.GetPlayer(invoice.fromId)
-            if fromPlayer then
-                TriggerClientEvent("QBCore:Notify", invoice.fromId, locale("notifications.invoice_paid_to_sender", invoiceId, player.PlayerData.charinfo.firstname .. " " .. player.PlayerData.charinfo.lastname), "success")
+            local sender = Ox.GetPlayer(invoice.fromId)
+            if sender then
+                TriggerEvent('ox_lib:notify', invoice.fromId, {
+                    title = locale("notifications.invoice_paid_to_sender_title"),
+                    description = locale("notifications.invoice_paid_to_sender", invoiceId, player.getName(true)),
+                    type = 'success'
+                })
             end
 
-            cb({success = true})
-            return
+            return {success = true}
         end
     end
 
-    cb({success = false, message = locale("notifications.invoice_not_found")})
+    return {success = false, message = locale("notifications.invoice_not_found")}
 end)
 
-QBCore.Functions.CreateCallback("aura-registers:server:PayCash", function(source, cb, data)
-    local src = source
-    local player = QBCore.Functions.GetPlayer(src)
-    local targetPlayer = QBCore.Functions.GetPlayer(tonumber(data.targetId))
+lib.callback.register("aura-registers:server:PayCash", function(source, data)
+    local giver = Ox.GetPlayer(source)
+    local receiver = Ox.GetPlayer(tonumber(data.targetId))
 
-    if not player or not targetPlayer then
-        cb({success = false, message = locale("notifications.invalid_players")})
-        return
+    if not giver or not receiver then
+        return {success = false, message = locale("notifications.invalid_players")}
     end
 
-    if player.PlayerData.job.name ~= data.registerJob then
-        cb({success = false, message = locale("notifications.unauthorized")})
-        return
+    if giver.getJob() ~= data.registerJob then
+        return {success = false, message = locale("notifications.unauthorized")}
     end
 
-    if targetPlayer.PlayerData.money.cash < data.amount then
-        cb({success = false, message = locale("notifications.insufficient_cash")})
-        return
+    local cashCount = Ox.GetItemCount(tonumber(data.targetId), 'money')
+    if cashCount < data.amount then
+        return {success = false, message = locale("notifications.insufficient_cash")}
     end
 
-    targetPlayer.Functions.RemoveMoney("cash", data.amount)
-    player.Functions.AddMoney("cash", data.amount)
+    Ox.RemoveItem(tonumber(data.targetId), 'money', data.amount)
+    Ox.AddItem(source, 'money', data.amount)
 
-    TriggerClientEvent("QBCore:Notify", src, locale("notifications.payment_received", data.amount), "success")
+    TriggerEvent('ox_lib:notify', source, {
+        title = locale("notifications.payment_received_title"),
+        description = locale("notifications.payment_received", data.amount),
+        type = 'success'
+    })
 
-    TriggerClientEvent("QBCore:Notify", tonumber(data.targetId), locale("notifications.cash_payment_made", data.amount), "success")
+    TriggerEvent('ox_lib:notify', tonumber(data.targetId), {
+        title = locale("notifications.cash_payment_made_title"),
+        description = locale("notifications.cash_payment_made", data.amount),
+        type = 'success'
+    })
 
-    cb({success = true})
+    return {success = true}
 end)

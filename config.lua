@@ -38,11 +38,11 @@ Config = {
             }
         },
 
-        --[[
+                --[[
         beanmachine = {
             id = "2",                                    -- Unique identifier for this register (must be different from others)
             label = "Bean Machine",                       -- Display name shown in the UI
-            jobRequired = "beanmachine",                  -- Job name required to access this register (from qb-core/shared/jobs.lua)
+            jobRequired = "beanmachine",                  -- Job name required to access this register (from es_extended/shared/jobs.lua)
             openingMethod = "target",                     -- "target" for cash register prop target, "boxzone" for boxzone areas to be targettable
             locations = {                                 -- Array of locations where this register can be accessed
                 { coords = vector3(-635.0, 236.0, 81.0), heading = 180.0 }  -- Vector3 coordinates and heading direction
